@@ -1,0 +1,348 @@
+Copyright 2008-2011 Lockheed Martin Corporation
+
+The Vortex program is open source software: you can copy it, redistribute it and/or modify
+it under the terms of the GNU General Public License version 2.0 as published by
+the Free Software Foundation.  The Vortex Program and any derivatives of the Vortex program 
+must be licensed under GPL version 2.0 and may not be licensed under GPL version 3.0.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY OF ANY KIND, including without limitation the implied warranties of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details at http://www.gnu.org/licenses/gpl-2.0.html.
+
+The term "Vortex" should be taken to also include any portions or derived works of Vortex.  
+
+You are highly encouraged to send your changes to the Vortex program to 
+opensource.tools.security@lmco.com for possible incorporation into the main distribution.  
+By sending these changes to Lockheed Martin, you are granting to Lockheed Martin 
+Corporation the unlimited, perpetual, non-exclusive right to reuse, modify, 
+and/or relicense the code on a royalty-free basis.
+
+The libraries to which Vortex links are distributed under the terms of their own licenses.  
+Please see those libraries for their applicable licenses.
+
+Applications created to analyze or process data that is outputted from
+Vortex are viewed as separate works and not derivative.
+
+
+Introduction:
+
+Vortex is an application for intrusion detection and network surveillance. It relies heavily on libnids by Rafal Wojtczuk (see http://libnids.sourceforge.net/).
+
+Vortex is designed to facilitate agile creation of advanced network intrusion detection or network surveillance systems. It performs the hard work of packet capture, filtering, and reassembly then provides that data to external programs for analysis. Stream data is stored in files and stream meta data is output via STDOUT (meta data is encoded in file name). Vortex provides a platform for highly flexible, multithreaded, near real time deep analysis of network payload data.
+
+Changes:
+
+See RPM changelog for changes (end of vortex.spec)
+
+Motivation:
+
+Vortex is designed to compliment current NIDS such as Snort (http://www.snort.org) or Bro (http://bro-ids.org) by facilitating analysis not possible in conventional NIDS. Some examples of things that can be done in conjunction with vortex are:
+1. Leverage existing code and/or scripting languages
+2. High latency analysis
+3. Multithreaded analysis
+
+Since it can be used for offline analysis it can also compliment tools such as wireshark (http://wireshark.org) or tcpflow (http://www.circlemud.org/~jelson/software/tcpflow). Some situations where vortex may be of benefit include:
+1. When wireshark doesn't have a (complete) decoder for the protocol you are interested in analyzing. 
+2. When the output of vortex, including extended metadata, is convenient for your analysis.
+3. When the performance and accuracy is of vortex is preferable over other tools. 
+
+If not clear at this point, vortex is designed to facilitate analysis that is not very common. If you trying to do something that can be done in any of the aforementioned tools, you'll probably be better off and happier using them. If, however, you are trying to do something that conventional tools can't do feasibly, then hopefully you find vortex useful.
+
+It is also hoped that use of vortex will drive research and development of NIDS, such that some day, some other tool will provide a better solution. Until that occurs, it is hoped that vortex provides a useful and common platform for both research and operations.
+
+Usage:
+
+Vortex can be used as a user program much like tcptrace et al. Vortex can also be used as daemon. Example init scripts and config file are provided.
+
+Vortex is used by specifying an input (pcap file or interface), a directory in which to store stream data, amount of data to collect in each direction, filters, and numerous other options. The analyzer program reads the stream meta data (file names), open and analyzes the files, and optionally purges the files after they are analyzed. If large numbers of streams are to be analyzed simultaneously, the connection hash table (-s) may need to be increased. See TCP_LIMIT count in error logs (-E).
+
+Example:
+
+Imagine that you want to apply the spamsum algorithm to all web requests. You could do something like the following:
+
+vortex -i eth0 -t /tmp/vortex_demo/ | xargs -l ssdeep | logger
+
+which would yield logs such as:
+
+Mar 23 18:54:22 hostname logger: 3:ixx1PQcFI5LM38iIjMFykMFPDD7IM/R/CZJMT9yn:ixz7Z3EPLIM/7By,"/tmp/vortex_demo/127.0.0.1:42742s127.0.0.1:80"
+
+Note that this example neglects many details. See section "Analyzer Development" below.
+
+Compiling:
+
+You will need libnids, libpcap, and optionally libbsf to build and use vortex. Compile instructions can be found at the begginging of the source files.
+
+See http://libnids.sourceforge.net for libnids. You'll want at least v1.23. Satisfying this dependency will likely be the hardest part of bulding/installing vortex.
+
+If you are using Red Hat or CentOS and want to use RPMS to install, you might consider the RPM for libnids offered by EPEL (http://fedoraproject.org/wiki/EPEL).
+
+
+Filtering:
+
+Vortex supports tcpdump style filter expressions which are used by the BPF filtering mechanism.
+Vortex also can use libBSF which is similar to BPF but with stream semantics instead of packet semantics. 
+Vortex also supports simple sampling or polling.
+
+BPF filtering
+
+It is highly recommended that you use a BPF to limit traffic seen by vortex to the extent possible. In the case of IP fragmented streams (which vortex supports) is possible to loose data with a naive BPF. For example, if a TCP packet is fragmented, only the first fragment will contain the tcp header and so only the first packet will match a filter such as "tcp port 80". See the LibNIDS documentation for more details and workarounds.
+
+libBSF
+
+LibBSF implements the tcpdump filter syntax and the BPF virtual machine with stream semantics. The tcpdump-like expression is very similar to tcpdump filter language. See man tcpdump(8). Syntax is the same. The allowed primitives are close to the subset of primitives relating to streams.
+Allowable primitives are: clt, svr, host, net, mask, port, portrange
+"clt" indicates the stream client, "svr" indicates the stream server, otherwise the primitives have the same meaning
+Don't use primitives like ether, ip, tcp, udp, len, etc. The results will not be coherent even if no errors are thrown. If you are tempted to use them, you are probably trying to use the wrong tool for your needs.
+
+Metadata:
+
+Metadata for each stream is encoded in the filename.
+
+Short metadata is as follows:
+{client_ip}:{client_port}{direction}{server_ip}:{server_port}
+ex.
+10.1.1.1:1954s172.16.1.1:80
+
+The direction, either "s" or "c" represent the stream from client to server and from server to client respectively
+
+Extended metatdata is as follows:
+
+{proto}-{connection_serial_number}-{connection_start_time}-{connection_end_time}-{connection_end_reason}-{connection_size}-{client_ip}:{client_port}{direction}{server_ip}:{server_port}
+ex.
+
+tcp-1-1229100756-1229100756-c-390-10.1.1.1:1954s172.16.1.1:80
+
+The serial number is simply an increasing stream identifier. All times are in unix timestamp form. connection_end_time represents the last time data was sent over the connection, not when the stream was dumped by vortex (fstat the file if you want that). connection_size indicates the size captured for the whole connection which is the sum of both simplex flows (if you want individual stream sizes, use fstat). connection_end_reason is one of the following values indicating the reason the flow was dumped:
+
+c => Well formed TCP close
+r => Reset
+t => Time out
+e => Stream ended prematurely becuase vortex is exiting
+l => Stream size limit exceeded
+i => Connection exceeded idle limit
+
+Performance:
+
+Vortex has been used to capture and analyze large amounts of data with very low packet loss. Vortex was designed with multithreaded analysis in mind, allowing for very expensive or high-latency analysis to be performed in near real time on commodity hardware.
+
+Multithreaded Analysis
+
+One of the major design goals of vortex was to enable multithreaded analysis in support of high latency and/or computationally expensive analysis. Within reason, vortex sufficiently removes the real-time contraints of packet capture and provided reassembled stream data to external analysis applications.
+
+There are numerous ways to implement multithreading using vortex. 
+
+One approach that works well with standard CLI utilities is the multithreading that can be implemented with xargs (see -L and -P options).
+
+Similarly, if you have an analyzer that accepts the input file list in STDIN instead of as arguments (as with xargs) then you should consider using the included xpipes program. xpipes was written specifically to facilitate multithread analysis on top of vortex, especially with single threaded analyzers. 
+
+xpipes can be used as follows to create a multithreaded analyzer from a single threaded one:
+
+single threaded:
+
+vortex {vortex arguments} | analyzer {analyzer arguments}
+
+multithread:
+
+vortex {vortex arguments} | xpipes -c 'analyzer {analzyer arguments}'
+
+or
+
+echo 'analyzer {analzyer arguments}' > analyzer.cmd
+vortex {vortex arguments} | xpipes -f analyzer.cmd
+
+
+RAMdisk
+
+It is recommended that if vortex is used to analyze large amounts of data, especially if the data is deleted after it is analyzed, that temporary stream files be written to a file system in RAM instead of on hard disk. Ex. tmpfs or /dev/shm on most linux distros.
+
+Packet Capture:
+
+The following setting changes may help if you are experiencing packet loss between the kernel and vortex (PCAP_DROP in performance stats).
+
+#! /bin/bash
+#
+#Red Hat Defaults:
+#
+cat /proc/sys/net/core/rmem_default
+cat /proc/sys/net/core/rmem_max
+cat /proc/sys/net/core/netdev_max_backlog
+#
+#New settings
+#
+echo 67108864 > /proc/sys/net/core/rmem_default
+echo 67108864 > /proc/sys/net/core/rmem_max
+echo 50000 > /proc/sys/net/core/netdev_max_backlog
+
+
+
+#for /etc/sysctl.conf to make the changes persistant
+
+#Set some capture pertinant settings
+#defaults
+#net.core.rmem_default = 109568
+#net.core.rmem_max = 131071
+#net.core.netdev_max_backlog = 1000
+#
+#net.core.rmem_default = 67108864
+#net.core.rmem_max = 67108864
+#net.core.netdev_max_backlog = 50000
+
+The following may help if you are experiencing packet loss between the NIC and kernel (ifconfig RX dropped):
+
+To check the current setting and determine the maximum, use the ethtool -g option:
+
+ /sbin/ethtool -g eth2
+# Ring parameters for eth2:
+# Pre-set maximums:
+# RX:             1020
+# RX Mini:        0
+# RX Jumbo:       0
+# TX:             255
+# Current hardware settings:
+# RX:             255
+# RX Mini:        0 
+# RX Jumbo:       0
+# TX:             255
+
+
+#To change the rx ring size, use the ethtool -G option:
+
+ /sbin/ethtool -G eth2 rx 1020
+
+#To make this change permanent put the command(s) in the /sbin/ifup-local script. It can be created as follows:
+
+ touch /sbin/ifup-local
+ chmod 744 /sbin/ifup-local
+ echo "/sbin/ethtool -G eth2 rx 1020" >> /sbin/ifup-local
+
+#The max rx ring size is 1020 bnx2 and 4096 for e1000e. 
+
+
+Errors:
+
+The errors reported by vortex are explained in more detail as follows:
+
+TOTAL: total errors since program start
+IP_SIZE: packets with invalid size (reflected from libNIDS)
+IP_FRAG: problems with IP frag (reflected from libNIDS)
+IP_HDR: problems with IP header (reflected from libNIDS)
+IP_SRCRT: packets attempting source routing (reflected from libNIDS)
+TCP_LIMIT: maximum number of simultaneous TCP streams to follow exceeded (reflected from libNIDS)
+TCP_HDR: problems with TCP header. If this value is very high, consider disabling TCP checksums (-k) (reflected from libNIDS)
+TCP_QUE: problems with the TCP received queue. This is usually caused by packet loss. (reflected from libNIDS)
+TCP_FLAGS: problems with hte TCP header flags (reflected from libNIDS)
+UDP_ALL: various problems with UDP (reflected from libNIDS)
+SCAN_ALL: various detections such as port scans. These detection mechanisms are normally disabled. (reflected from libNIDS)
+VTX_IO: Errors occuring writing data stream out
+VTX_MEM: Errors occured allocating memory. Streams may either be dropped or may contain "holes".
+VTX_RING: internal lockless stream ring queue was overrun and streams were dropped. Try increasing ring size (-Q) and/or decreasing poll interval (-R)
+OTHER: Other miscelaneous errors
+
+Performance Stats:
+
+The stats reported by vortex are explained in more detail as follows:
+
+PCAP_RECV: number of packets processed by vortex  (reflected from libpcap). Now 64-bit wrapper around the 32-bit value returned by PCAP. Collection and reporting thread must be with low enough period to prevent aliasing.
+PCAP_DROP: number of packets dropped by vortex (reflected from libpcap). Now 64-bit wrapper around the 32-bit value returned by PCAP. Collection and reporting thread must be with low enough period to prevent aliasing.
+VTX_BYTES: number of bytes of stream data collected by vortex (doesn't include headers, filtered, or other non-collected data)
+VTX_EST: number of streams established
+VTX_WAIT: number of streams finished but not yet dumped
+VTX_CLOSE_TOT: number of streams for which we are finished collection
+VTX_CLOSE: number of streams finished because of tcp close 
+VTX_LIMIT: number of streams finished because of size limits
+VTX_POLL: number of streams finished (skipped) due to polling
+VTX_TIMOUT: number of streams finished due to TCP timeout
+VTX_IDLE: number of streams finished due to inactivity (tunable -K)
+VTX_RST: number of streams finished due to TCP reset
+VTX_EXIT: number of stream finished (possibly pre-maturely) due to vortex exiting
+VTX_BSF: number of streams finished (skipped) due to BSF filtering
+
+Analyzer Development:
+
+While vortex is designed to facilitate use of existing code, it is often beneficial to create analyzers which may well be simply wrappers for other existing code. In some situations, it may be useful to create an analyzer from scratch specifically for use with vortex.
+
+It is perfectly acceptable to use scripting or interpretted langauages to implement vortex analyzers. In general, the analyzer will:
+1. Read file names (meta data) from STDIN
+2. Do some processing on the file
+3. Purge the file
+
+The following is an example of a possible shell script based analyzer which runs cracklib on FTP traffic, identifying users with weak passwords:
+
+
+vortex -i eth0 -s 1000000 -C 0 -S 1000 -l -t /dev/shm/ -f "tcp port 21" -e -K 300 | while read file
+    #Loop on each stream file. file contains metadata that looks something like "/dev/shm/tcp-38-1261503711-1261503711-c-174-172.16.17.18:3787s10.20.30.40:21"
+    do 
+        #extract credentials from stream
+        CREDS=`cat $file | tr '\r\n' '  ' | sed -r 's/.*USER (\S+)  PASS (\S+) .+$/\1 \2/g'` 
+        #CREDS is something like "username password"
+        
+        RESULT=`echo "$CREDS" | cut -f 1 -d " " --complement | /usr/sbin/cracklib-check`
+        #RESULTS is either "password: warning message" or "password: OK"
+        
+        #If password isn't OK, the log then username, warning message, and connection info
+        if ! echo $RESULT | grep "OK$" > /dev/null
+        then 
+            USER=`echo $CREDS | cut -f 1 -d " "`
+            MESSAGE=`echo $RESULT | awk -F: '{ print $NF }'`
+            METADATA=`basename $file`
+            
+            echo "Weak password ($MESSAGE ) for $USER in connection $METADATA" | logger -t "ftp_pass_check" -s
+        fi
+        
+        #Purge the file
+        rm $file
+    done
+
+
+The output would be something like the following:
+
+ftp_pass_check: Weak password ( it is based on a dictionary word ) for alice in connection tcp-38-1261503711-1261503711-c-174-172.16.17.18:3787s10.20.30.40:21
+ftp_pass_check: Weak password ( it is too short ) for bob in connection tcp-40-1261503713-1261503714-c-192.168.254.254:54738s172.16.4.82:21
+
+Note the command line options. These options are the more common options you should consider using for live analysis. In addition to these, it is recommended to set -H, -E, -R, and -L accordingly. 
+
+If you are performing analysis that has very high latency, you may need to implement threading or parallel processing. If you are using tmpfs (/dev/shm) for your temporary storage area, you might use mmap() instead of read(), if available, to load data into a buffer for analysis.
+
+
+Limitations:
+
+
+Vortex has very little support for network encapsulation other than IPv4 over Ethernet. You will likely have problems with IPv6, GRE tunnels, IPSEC, etc.
+
+Vortex doesn't dump streams until collection for that stream has finished (either a limit was reached or stream was closed). This is by design but can be troublematic for streams that are kept open for a very long time (which are rare in practice).
+
+Vortex only supports TCP.
+
+
+Community Contributions:
+(The following are provided for information purposes only.)
+
+Securityfu Blog: Vortex IDS - Get Super Snagadocious on Ubuntu, http://securityfu.blogspot.com/2010/02/vortex-ids-get-super-snagadocious-on.html
+    - Introduction to vortex on Ubuntu
+SmuSec Blog: Vortex Howto Series http://smusec.blogspot.com/search/label/vortex%20howto
+    - Series of posts on how to use vortex for various tasks
+Security Onion LiveCD: http://securityonion.blogspot.com/, https://sourceforge.net/projects/security-onion/
+    - Ubuntu based LiveCD contain numerous netwerk security/IDS tools
+StreamDB: Network stream database framework, http://code.google.com/p/streamdb/    
+    - Open source project that stores and retrieves streams recontructed by vortex
+Ruminate IDS: Modular System for Network Payload Analysis, http://ruminate-ids.org/
+    - IDS based on vortex focussing on analysis of payload object such as documents
+FreeBSD patch: https://sourceforge.net/news/?group_id=255425&id=298842
+    - Patch disabling some less portable features of vortex, making compilation easier on BSDs
+
+Note: the Smusec blog and Ruminate IDS are independent works of Charles Smutz, one of the authors of vortex.
+
+Newer community contributions can be found on the vortex news page: https://sourceforge.net/news/?group_id=255425
+
+
+Improvements:
+
+There are many improvements to be made to vortex. If you make useful improvements, please provide them to the authors so we can consider integrating them. Even improvements to documentation, packaging, etc are both needed and desired.
+
+Support and Feature requests:
+
+While we can provide no gaurantees for support or improvements, if you are using vortex and have any feedback that will help us drive improvements, we'd love to hear from you. You can post on the sourceforge forum or contact us directly: opensource.tools.security@lmco.com
+
+
+
