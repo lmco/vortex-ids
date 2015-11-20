@@ -1,0 +1,103 @@
+#!/bin/sh
+#
+# chkconfig: - 55 45
+#
+# Init script for vortex based utilities
+#
+#
+#
+
+. /etc/init.d/vortex_conf_parser
+
+
+
+# Source function library.
+. /etc/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ "${NETWORKING}" = "no" ] && exit 0
+
+
+
+
+
+RETVAL=0
+
+chktmpdir()
+{
+	if [ -e $VORTEX_OPTION_DATA_DIR ]
+	then
+			echo "$VORTEX_OPTION_DATA_DIR already exists" > /dev/null
+	else
+		echo "$VORTEX_OPTION_DATA_DIR doesn't exist. Creating...."
+		mkdir -p $VORTEX_OPTION_DATA_DIR
+		#chown to specified user if specified
+		if [ -n "$VORTEX_USER" ]
+		then
+  			chown $VORTEX_USER $VORTEX_OPTION_DATA_DIR
+		fi
+	fi
+}
+
+start() {
+	echo -n $"Starting $VORTEX_ANALYZER_NAME: "
+	chktmpdir
+	eval $VORTEX_COMMAND1
+	daemon $VORTEX_COMMAND2 2>/dev/null
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/$VORTEX_PROGRAM_NAME
+	return $RETVAL
+}
+
+stop() {
+	echo -n $"Shutting down $VORTEX_ANALYZER_NAME: "
+	killproc $VORTEX_PROGRAM_NAME
+	RETVAL=$?
+	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/$VORTEX_PROGRAM_NAME
+	echo
+	return $RETVAL
+}
+
+dostatus() {
+	status $VORTEX_PROGRAM_NAME
+}
+
+restart() {
+	stop
+	start
+}
+
+condrestart() {
+	[ -e /var/lock/subsys/$VORTEX_PROGRAM_NAME ] && restart || :
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  restart|reload)
+	restart
+	;;
+  condrestart)
+	condrestart
+	;;
+  status)
+	dostatus
+	;;
+	checktemp)
+	chktmpdir
+	;;
+  *)
+	echo "Usage: $VORTEX_ANALYZER_NAME {start|stop|restart|reload|condrestart|status|checktemp}"
+	exit 1
+esac
+
+exit $RETVAL
