@@ -528,7 +528,7 @@ int main (int argc, char **argv)
     //fprintf(stderr, "Done processing input, finishing up\n");
 
     //join all the writer threads
-    for (i=0; i < num_procs; num_procs++)
+    for (i = 0; i < num_procs; i++)
     {
         pthread_join(thread_refs[i], NULL);
     }
