@@ -8,5 +8,5 @@ libBSF is a stream filtering library based on BPF and tcpdump syntax that vortex
 libBSF is an optional component of vortex, however it is included by default in the vortex spec file.
 
 ## xpipes
-xpipes is a simple utility for multiplexing pipes. 
+xpipes is a simple utility for multiplexing pipes that is similar to parallel and xargs but designed to work in situations where items are multiplexed to long running programs reading from STDIN.
 xpipes is intended to be used in conjunction with vortex to create multi-threaded analyzers, but it can also be used as a standalone utility.
