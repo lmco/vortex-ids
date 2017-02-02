@@ -29,9 +29,9 @@
  * a flexible program for tcp reassembly
  * compile:
  * (If you have libbsf installed as shared library)
- * gcc vortex.c -lnids -lpthread -lbsf -Wall -DWITH_BSF -o vortex -O2
+ * gcc vortex.c -lnids -lpthread -lbsf -lpcap -Wall -DWITH_BSF -o vortex -O2
  * (If you don't have libsf)
- * gcc vortex.c -lnids -lpthread -Wall -o vortex -O2
+ * gcc vortex.c -lnids -lpthread -lpcap -Wall -o vortex -O2
  */
 
 #define _GNU_SOURCE

@@ -3,7 +3,7 @@
 
 Name: vortex 
 Version: 2.9.0
-Release: 59%dist
+Release: 60%dist
 Summary: real-time passive network capture and TCP stream reassembly
 Vendor: Lockheed Martin
 License: GPLv2
@@ -34,7 +34,7 @@ cp -fp %{SOURCE5} ./
 cp -fp %{SOURCE6} ./
 
 %build
-gcc %optflags vortex.c -o vortex -lnids -lpthread -lbsf -DWITH_BSF
+gcc %optflags vortex.c -o vortex -lnids -lpthread -lbsf -lpcap -DWITH_BSF
 gcc %optflags xpipes.c -o xpipes -lpthread
 
 %install
@@ -99,6 +99,8 @@ install -m755 $RPM_SOURCE_DIR/vortex.LICENSE \
 
 %changelog
 
+* Thu Feb 02 2017 Zach Rasmor <zachary.r.rasmor@lmco.com> 2.9.0-60
+- Add -lpcap flag to compilation
 * Fri Sep 16 2011 Charles Smutz <opensource.tools.security@lmco.com> 2.9.0-59
 - Documentation updates: derivative work clarification and community contributions links
 * Tue Jan 04 2011 Charles Smutz <opensource.tools.security@lmco.com> 2.9.0-58
